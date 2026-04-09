@@ -1,0 +1,15 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Data & indexes — large, generated, not committed
+data/raw/
+data/processed/
+index/
+
+# OS
+.DS_Store
+
