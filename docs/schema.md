@@ -1,6 +1,6 @@
 # Legal Casebase — Working Schema Document
 
-**Version:** v0.4  
+**Version:** v0.5  
 **Status:** In Review  
 **Purpose:** This is the shared schema working document for Shobhit, ChatGPT, and Claude. It is meant to record:
 1. what was explored,
@@ -492,6 +492,49 @@ Reason for nullable targets:
 - local corpus may not contain every cited opinion,
 - we still want to preserve the reference.
 
+
+### 7.6 Locked ingestion rules for MVP
+
+These are operational rules that are now treated as part of the schema contract for the MVP.
+
+#### 7.6.1 Raw preservation
+- Save raw CourtListener payloads to `data/raw/` before normalization.
+- Preserve dockets, clusters, and opinions as source snapshots so normalization can be rerun without re-fetching.
+
+#### 7.6.2 Source-to-table mapping
+- Create **`cases`** from **docket** payloads.
+- Create **`clusters`** from **cluster** payloads and link them to `cases`.
+- Create **`opinions`** from **opinion** payloads and link them to both `cases` and `clusters`.
+
+#### 7.6.3 Clean text derivation
+Derive `opinions.clean_text` using the locked fallback-aware priority:
+
+1. `plain_text` if present and non-empty
+2. otherwise cleaned `html_with_citations`
+3. otherwise cleaned `html`
+4. otherwise mark the opinion as low-quality / needs special handling
+
+Also record the chosen source in `opinions.text_source`.
+
+#### 7.6.4 Chunk creation
+- Create **`chunks`** from `opinions.clean_text`, not directly from raw HTML fields.
+- Chunking should remain section-aware when possible, with paragraph/fixed fallback as already decided.
+- `chunks.case_id` is an intentional denormalization for search/result assembly convenience.
+
+#### 7.6.5 Citation ingestion
+- Create **`citations`** primarily from `opinions_cited`.
+- If a cited opinion exists in the local corpus, populate `to_opinion_id`.
+- If it does not exist locally, preserve the reference using the nullable source fields instead of dropping it.
+
+#### 7.6.6 Blocked/privacy handling
+- Respect `blocked` at the case/cluster ingestion layer.
+- Do not assume opinion-level `blocked` support unless future exploration explicitly verifies it.
+
+#### 7.6.7 Embedding / indexing order
+- Chunks may be inserted before embeddings are generated.
+- FTS5 indexing should track chunk inserts/updates/deletes through the normal `chunks` write path.
+- Vector indexing can happen in a later pass after chunks exist.
+
 ---
 
 ## 8. Explicitly Rejected or Deferred
@@ -564,3 +607,4 @@ out of scope for MVP.
 - **v0.2** — locked raw preservation to filesystem snapshots for MVP, clarified intentional chunk denormalization, added blocked/privacy verification as an explicit open question, and updated schema notes accordingly.
 - **v0.3** — locked the existence of a normalized `clusters` table while keeping its depth open, added normalization-first policy for MVP, evaluated the enriched flat-opinion model explicitly, and clarified that broad denormalization is deferred until justified by evidence.
 - **v0.4** — incorporated verification findings: validated docket-first identity with sampled multi-cluster dockets, validated multi-opinion clusters using older SCOTUS data, replaced the simplistic text-field rule with a verified fallback-aware extraction priority, clarified blocked/privacy handling, resolved the MVP decision to exclude `opinions.blocked`, and replaced the prior verification checklist with completed verification results plus the immediate next step.
+- **v0.5** — added locked MVP ingestion rules to the schema document, covering raw preservation, source-to-table mapping, `clean_text` derivation, chunk creation, citation ingestion, blocked/privacy handling, and the intended ordering of chunk insertion versus embedding/index generation.
