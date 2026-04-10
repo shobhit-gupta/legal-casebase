@@ -1,6 +1,6 @@
 # Legal Casebase — Working Schema Document
 
-**Version:** v0.3  
+**Version:** v0.4  
 **Status:** In Review  
 **Purpose:** This is the shared schema working document for Shobhit, ChatGPT, and Claude. It is meant to record:
 1. what was explored,
@@ -73,12 +73,20 @@ This gave us:
 ### 3.2 Real payload exploration
 We inspected:
 - a live `opinions` query for recent SCOTUS records,
-- a real opinion payload,
+- a real recent opinion payload,
 - its parent cluster payload,
 - its parent docket payload.
 
-### 3.3 What this changed
-This moved the work from **API-shape assumptions** to **data-informed schema reasoning**.
+### 3.3 Verification exploration
+We then verified several open schema questions with targeted checks:
+
+1. measured how often recent SCOTUS dockets have multiple clusters with `precedential_status=Published`,
+2. located an older SCOTUS cluster with multiple `sub_opinions`,
+3. compared `plain_text` against cleaned `html_with_citations`,
+4. checked `blocked` handling in sampled clusters and inspected opinion payloads for opinion-level blocked support.
+
+### 3.4 What this changed
+This moved the work from **API-shape assumptions** to **data-informed schema reasoning** and resolved several previously open questions.
 
 ---
 
@@ -117,7 +125,9 @@ But for recent SCOTUS cases, many richer metadata fields are empty:
 - `history`
 - `citations` often empty
 
-**Inference:** cluster is important, but too thin to be the sole canonical case record for the MVP.
+At the same time, verification against older SCOTUS material showed that a real cluster can contain **multiple linked opinions**: one sampled cluster (`95500`) contained **4** `sub_opinions`.
+
+**Inference:** cluster is important and cannot be skipped, but it is still too thin to be the sole canonical case record for the MVP.
 
 ---
 
@@ -138,6 +148,11 @@ The docket payload adds the best case-level metadata:
 
 Most importantly, a docket can contain **multiple clusters**.
 
+This is not just theoretical. In the sampled recent published SCOTUS slice:
+- **18** unique dockets were observed
+- **2** of them had more than one published cluster
+- this is **11.11%** of the sampled unique dockets
+
 **Inference:** docket is the most stable case-level object and should anchor canonical case identity.
 
 ---
@@ -153,11 +168,21 @@ For recent SCOTUS entries, many rich editorial/legal metadata fields are empty o
 
 ---
 
-### 4.5 Text field strategy is now clear
-- Use **`plain_text`** for cleanup, chunking, and FTS indexing.
-- Use **`html_with_citations`** for richer detail-page display when available.
+### 4.5 Text field strategy is now verified
+The earlier simple rule of “use `plain_text` for chunking, `html_with_citations` for display” turned out to be incomplete.
 
-**Inference:** keep both fields at the opinion layer.
+Verification showed:
+
+- in a recent case, `plain_text` and cleaned `html_with_citations` normalize to very similar usable text,
+- in an older case, `plain_text` was empty while `html_with_citations` contained the real opinion text.
+
+**Locked extraction priority:**
+1. use `plain_text` if present and non-empty,
+2. otherwise use cleaned `html_with_citations`,
+3. otherwise use cleaned `html`,
+4. otherwise mark the opinion as low-quality / needs special handling.
+
+**Inference:** keep both `plain_text` and `html_with_citations`, but derive a normalized `clean_text` field using a fallback-aware priority rule.
 
 ---
 
@@ -174,6 +199,17 @@ For recent SCOTUS entries, many rich editorial/legal metadata fields are empty o
 `opinions_cited` provides a useful opinion-to-opinion edge list.
 
 **Inference:** MVP does not need the dedicated citation API before it can support a useful citation graph / related cases feature.
+
+---
+
+### 4.8 Blocked/privacy handling is now clearer
+Verification showed:
+- sampled recent published SCOTUS clusters had `blocked: false` consistently across the inspected pages,
+- `blocked` was present on cluster and docket payloads,
+- `blocked` was **not** present on the opinion payloads we directly inspected,
+- opinion-level blocked support was also not evident in the previously explored opinions endpoint shape.
+
+**Inference:** keep `blocked` as a case/cluster-level ingestion safety field for MVP. Do not add `opinions.blocked` unless future data explicitly proves the field exists.
 
 ---
 
@@ -203,7 +239,8 @@ Reason:
 Reason:
 - useful for decision-level metadata,
 - not rich enough to be the canonical case record,
-- still important between docket and opinion.
+- still important between docket and opinion,
+- verified to support multi-opinion decision groupings in older SCOTUS material.
 
 ### 5.4 Retrieval unit
 **Locked:** `chunk`
@@ -213,10 +250,16 @@ Reason:
 - supports FTS5 + FAISS,
 - future RAG layer will naturally operate on chunks.
 
-### 5.5 Text field usage
+### 5.5 Text field usage / extraction priority
 **Locked:**
-- `plain_text` for cleanup/chunking/indexing
-- `html_with_citations` for display
+- preserve `plain_text` and `html_with_citations`
+- derive `clean_text` using this priority:
+  1. `plain_text` if non-empty
+  2. else cleaned `html_with_citations`
+  3. else cleaned `html`
+
+Reason:
+- recent and older opinions do not behave consistently enough for a single-field assumption.
 
 ### 5.6 Raw preservation strategy
 **Locked for MVP:** raw JSON files on disk under `data/raw/`
@@ -254,6 +297,14 @@ Reason:
 - makes performance and complexity tradeoffs measurable,
 - avoids premature schema drift.
 
+### 5.9 Opinion-level blocked field
+**Locked for MVP:** do **not** include `opinions.blocked`
+
+Reason:
+- not confirmed in inspected opinion payloads,
+- not needed for current ingestion safety decisions,
+- can be added later if verified by future exploration.
+
 ---
 
 ## 6. Open Decisions
@@ -289,19 +340,7 @@ Reason:
 
 ---
 
-### 6.3 Multiple substantive clusters per docket
-**Status:** Open factual question
-
-Question:
-How often does one target-case docket have multiple substantive clusters in the chosen SCOTUS slice?
-
-Why this matters:
-- if common, docket-first design is strongly validated,
-- if rare, the distinction still matters conceptually but less for MVP complexity.
-
----
-
-### 6.4 Section labeling strategy in chunks
+### 6.3 Section labeling strategy in chunks
 **Status:** Open
 
 Question:
@@ -316,21 +355,7 @@ Possible approaches:
 
 ---
 
-### 6.5 Opinion-level blocked/privacy field
-**Status:** Open factual question
-
-Question:
-Does the opinion object itself expose a `blocked` or equivalent privacy flag in the target slice?
-
-Current evidence:
-- `blocked` was seen on cluster and docket payloads.
-- It has **not yet been confirmed** on the real opinion payloads we inspected.
-
-**Current leaning:** do not add an `opinions.blocked` field until it is verified in actual opinion data or official endpoint metadata.
-
----
-
-### 6.6 Flat opinion model enriched with docket/cluster fields
+### 6.4 Flat opinion model enriched with docket/cluster fields
 **Status:** Evaluated, not adopted as base schema
 
 Question:
@@ -424,8 +449,8 @@ Suggested fields:
 
 Notes:
 - `author_display` can be derived from available fields (`author_str`, cluster `judges`, etc.)
-- `clean_text` is the normalized text used for chunking/indexing
-- No `blocked` field is included yet because opinion-level support for that field has not been confirmed in the explored payloads
+- `clean_text` is the normalized text used for chunking/indexing and should follow the locked priority rule in Section 5.5
+- No `blocked` field is included because opinion-level support for that field has not been confirmed in the explored payloads
 
 ---
 
@@ -506,13 +531,30 @@ out of scope for MVP.
 
 ---
 
-## 9. Recommended Next Verification Steps
+## 9. Verification Results and Immediate Next Step
 
-1. Measure how often target SCOTUS dockets have multiple substantive clusters.
-2. Fetch one cluster with multiple sub-opinions (majority + dissent/concurrence).
-3. Compare `plain_text` vs cleaned `html_with_citations` on one or two cases.
-4. Verify that `blocked: false` is consistent across the chosen SCOTUS slice and confirm whether opinion-level blocked/privacy fields exist.
-5. Lock exact SQL schema after those checks.
+### Completed verification results
+
+1. **Multiple published clusters per docket**
+   - measured on a sampled recent SCOTUS slice filtered to `precedential_status=Published`
+   - result: **18** unique dockets, **2** with more than one published cluster (**11.11%**)
+
+2. **Multiple opinions per cluster**
+   - verified in older SCOTUS material
+   - sampled cluster `95500` contained **4** linked `sub_opinions`
+
+3. **Text field comparison**
+   - recent opinion: `plain_text` and cleaned `html_with_citations` were highly similar
+   - older opinion: `plain_text` was empty while `html_with_citations` carried the real text
+   - result: fallback-aware text extraction rule is now locked
+
+4. **Blocked/privacy handling**
+   - sampled recent published SCOTUS clusters were consistently `blocked: false`
+   - opinion-level `blocked` was not present in the directly inspected opinion payloads
+
+### Immediate next step
+
+- lock exact SQL schema based on the current recommended MVP schema
 
 ---
 
@@ -521,3 +563,4 @@ out of scope for MVP.
 - **v0.1** — first shared working schema document combining CourtListener exploration, later docket/cluster/opinion findings, and the current reconciled schema direction.
 - **v0.2** — locked raw preservation to filesystem snapshots for MVP, clarified intentional chunk denormalization, added blocked/privacy verification as an explicit open question, and updated schema notes accordingly.
 - **v0.3** — locked the existence of a normalized `clusters` table while keeping its depth open, added normalization-first policy for MVP, evaluated the enriched flat-opinion model explicitly, and clarified that broad denormalization is deferred until justified by evidence.
+- **v0.4** — incorporated verification findings: validated docket-first identity with sampled multi-cluster dockets, validated multi-opinion clusters using older SCOTUS data, replaced the simplistic text-field rule with a verified fallback-aware extraction priority, clarified blocked/privacy handling, resolved the MVP decision to exclude `opinions.blocked`, and replaced the prior verification checklist with completed verification results plus the immediate next step.
