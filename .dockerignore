@@ -1,6 +1,10 @@
-.env
-.git/
+.git
 .gitignore
-__pycache__/
+.vscode
+.devcontainer
+__pycache__
 *.py[cod]
-.devcontainer/
+.env
+storage/sqlite/*.db
+storage/raw
+storage/faiss

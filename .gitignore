@@ -1,15 +1,24 @@
-# Environment
-.env
-
 # Python
 __pycache__/
 *.py[cod]
 
-# Data & indexes — large, generated, not committed
-data/raw/
-data/processed/
-index/
+# Local environment
+.env
+.vscode
+
+# Runtime storage
+storage/sqlite/*.db
+storage/raw/*
+storage/faiss/*
+
+# Keep folder structure
+!storage/sqlite/.gitkeep
+!storage/raw/.gitkeep
+!storage/faiss/.gitkeep
+!storage/README.md
 
 # OS
 .DS_Store
 
+# Experimentation
+docs/api_exploration

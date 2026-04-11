@@ -2,7 +2,7 @@ from pathlib import Path
 import sqlite3
 
 ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = ROOT / "data" / "casebase.db"
+DB_PATH = ROOT / "storage" / "sqlite" / "casebase.db"
 SCHEMA_PATH = ROOT / "db" / "schema.sql"
 
 
@@ -22,3 +22,12 @@ def init_db() -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     with get_connection() as conn:
         conn.executescript(schema)
+
+
+def main() -> None:
+    init_db()
+    print(f"Initialized database at {DB_PATH}")
+
+
+if __name__ == "__main__":
+    main()
