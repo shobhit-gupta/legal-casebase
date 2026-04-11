@@ -1,6 +1,6 @@
 # Legal Casebase — Working Schema Document
 
-**Version:** v0.5  
+**Version:** v0.7  
 **Status:** In Review  
 **Purpose:** This is the shared schema working document for Shobhit, ChatGPT, and Claude. It is meant to record:
 1. what was explored,
@@ -53,6 +53,26 @@ Court
 - **Cluster** = decision event / grouping layer
 - **Opinion** = actual text-bearing object
 - **Chunk** = retrieval unit derived from opinion text
+
+### 2.1 How to read this schema
+
+For this project:
+
+- **`cases`** = our normalized case-level table built from CourtListener **dockets**
+- **`clusters`** = the decision-event grouping layer under a case
+- **`opinions`** = the actual text-bearing opinions
+- **`chunks`** = retrieval units derived from opinion text
+- **`citations`** = opinion-level citation edges
+
+This means that a “case” in our app is anchored on the source **docket** object.
+
+### 2.2 Clarifying a few column meanings
+
+- **`blocked`** = a CourtListener safety/privacy flag seen on docket and cluster payloads; blocked records should not be surfaced normally
+- **`source_code`** = a lightweight CourtListener source/provenance marker, not raw JSON
+- **`text_source`** = records which field produced `clean_text` (`plain_text`, `html_with_citations`, or `html`)
+- **`date_ingested`** = when our local system stored/normalized the record, not when the court created it
+- **`source_*_id`** = original CourtListener IDs, kept for traceability
 
 ---
 
@@ -388,8 +408,6 @@ Suggested fields:
 - `case_name`
 - `case_name_short`
 - `docket_number`
-- `docket_number_core`
-- `docket_number_raw`
 - `date_filed`
 - `date_argued`
 - `appeal_from_str`
@@ -410,11 +428,9 @@ Suggested fields:
 - `absolute_url`
 - `slug`
 - `case_name`
-- `case_name_short`
 - `date_filed`
 - `judges`
 - `precedential_status`
-- `citation_count`
 - `source_code`
 - `blocked`
 - `date_ingested`
@@ -437,19 +453,18 @@ Suggested fields:
 - `per_curiam`
 - `page_count`
 - `download_url`
-- `local_path`
+- `sha1`
 - `plain_text`
 - `html_with_citations`
 - `clean_text`
 - `text_source`
 - `extracted_by_ocr`
-- `date_created_source`
-- `date_modified_source`
 - `date_ingested`
 
 Notes:
 - `author_display` can be derived from available fields (`author_str`, cluster `judges`, etc.)
 - `clean_text` is the normalized text used for chunking/indexing and should follow the locked priority rule in Section 5.5
+- `sha1` is kept as a lightweight content fingerprint for ingestion sanity checks and change detection
 - No `blocked` field is included because opinion-level support for that field has not been confirmed in the explored payloads
 
 ---
@@ -597,7 +612,7 @@ out of scope for MVP.
 
 ### Immediate next step
 
-- lock exact SQL schema based on the current recommended MVP schema
+- wire the locked SQL schema into the application and ingestion code
 
 ---
 
@@ -608,3 +623,5 @@ out of scope for MVP.
 - **v0.3** — locked the existence of a normalized `clusters` table while keeping its depth open, added normalization-first policy for MVP, evaluated the enriched flat-opinion model explicitly, and clarified that broad denormalization is deferred until justified by evidence.
 - **v0.4** — incorporated verification findings: validated docket-first identity with sampled multi-cluster dockets, validated multi-opinion clusters using older SCOTUS data, replaced the simplistic text-field rule with a verified fallback-aware extraction priority, clarified blocked/privacy handling, resolved the MVP decision to exclude `opinions.blocked`, and replaced the prior verification checklist with completed verification results plus the immediate next step.
 - **v0.5** — added locked MVP ingestion rules to the schema document, covering raw preservation, source-to-table mapping, `clean_text` derivation, chunk creation, citation ingestion, blocked/privacy handling, and the intended ordering of chunk insertion versus embedding/index generation.
+- **v0.6** — aligned the recommended MVP schema with the locked lean SQL baseline: trimmed low-value provenance fields, kept source/identity provenance that supports traceability and ingestion correctness, and updated the immediate next step now that the SQL schema is locked.
+- **v0.7** — added first-reader clarifications explaining that `cases` is the normalized case-level table built from CourtListener dockets, and documented the meaning of fields like `blocked`, `source_code`, `text_source`, `date_ingested`, and `source_*_id`.
