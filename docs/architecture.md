@@ -1,6 +1,6 @@
 # Legal Casebase Prototype — Architecture Decision Document
 
-**Version:** v0.2  
+**Version:** v0.5  
 **Status:** Draft / In Review  
 **Audience:** First-time reader, reviewer, and builders  
 **Purpose:** Explain what we are building, why this design was chosen, what was rejected, what is still open, and how the system is expected to evolve during the MVP build.
@@ -151,7 +151,11 @@ CourtListener gives a real legal corpus and is more credible than mock data whil
 
 **Current stance**
 
-CourtListener is locked as the primary route. The exact topical slice remains open.
+CourtListener is locked as the primary route.
+
+Initial corpus plan:
+- **Pass 1:** recent published SCOTUS cases (**2020–2026**), roughly **50–100 opinions**
+- **Pass 2:** a curated set of landmark cases to add recognizability, richer citation structure, and older multi-opinion decision patterns
 
 ---
 
@@ -258,13 +262,26 @@ Use a **containerized dev/runtime setup** from the start.
 
 - `Dockerfile` + `docker-compose.yml` are required
 - one primary app service
-- bind-mounted source code in dev
-- persisted data/index directories outside the image
+- source code is bind-mounted in dev
+- runtime artifacts live under `storage/`
+- in containerized development, `storage/` is backed by a Docker volume rather than the host repo directory
 - `.devcontainer/devcontainer.json` supported for VS Code
 
 **Why chosen**
 
 This reduces environment drift, supports early deployment, and keeps local and hosted execution closer together without introducing unnecessary multi-service complexity.
+
+#### Operational rule
+
+All storage-writing scripts should be run inside the app container or dev container.
+
+Example:
+
+```bash
+docker compose run --rm app python scripts/fetch.py
+```
+
+Do not run fetch / ingest / indexing scripts on the host.
 
 ---
 
@@ -315,7 +332,7 @@ The MVP is **normalization-first**:
 
 **Raw preservation**
 
-For MVP safety, raw CourtListener payloads are preserved as JSON snapshots under `data/raw/` before normalization.
+For MVP safety, raw CourtListener payloads are preserved as JSON snapshots under `storage/raw/` before normalization.
 
 ---
 
@@ -431,11 +448,15 @@ Goal:
 
 Only unresolved items belong here.
 
-### 8.1 Exact CourtListener Slice
+### 8.1 Landmark Expansion Depth
 
 **Status:** open
 
-**Why still open:** CourtListener is chosen, but the exact topical/court slice has not yet been finalized.
+**Why still open:** the initial CourtListener slice is now settled as:
+- **Pass 1:** recent published SCOTUS (**2020–2026**)
+- **Pass 2:** curated landmark cases
+
+What remains open is how aggressively the landmark pass should be expanded beyond the initial curated set.
 
 ### 8.2 Embedding Provider Execution
 
@@ -476,3 +497,6 @@ If this document and `docs/schema.md` ever diverge temporarily, treat `docs/sche
 
 - **v0.1** — first real filled architecture draft created from the agreed template, with all currently locked decisions filled in and remaining unresolved items marked as open.
 - **v0.2** — updated the architecture to reflect the newer CourtListener-driven model: docket as canonical case identity, cluster as thin linking layer, opinion as text/search anchor, chunk as retrieval unit; aligned UI flow and build plan with the current schema direction; added containerization as a locked architectural decision; clarified that exact SQL/schema details live in `docs/schema.md`.
+- **v0.3** — updated storage-path references to match the restructured project layout, including `storage/raw/` for raw payload preservation and `storage/` as the runtime artifact area in containerized development.
+- **v0.4** — aligned the containerization section with the current named-volume storage policy, removed duplicated bullets, and clarified that storage-writing scripts must run inside the containerized environment.
+- **v0.5** — updated the dataset section to reflect the now-settled CourtListener corpus plan: Pass 1 recent published SCOTUS (2020–2026), followed by a curated landmark-case pass; replaced the stale open question about the exact slice.

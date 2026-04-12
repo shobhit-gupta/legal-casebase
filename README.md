@@ -145,6 +145,16 @@ docker compose run --rm app python scripts/<script_name>.py
 
 If using VS Code, the repo also supports Dev Containers.
 
+## Runtime storage note
+
+In containerized development, `/workspace/storage` is backed by a Docker named volume.
+
+This means runtime artifacts written by the app or scripts inside the container are not written into the host repo's `./storage/` directory.
+
+Project rule:
+- run all storage-writing scripts inside the app container or dev container
+- do not run fetch / ingest / indexing scripts on the host machine
+
 ## Current status
 
 This project is now past the initial architecture/schema exploration phase and is entering **Phase 2 — Ingestion + Indexing**.

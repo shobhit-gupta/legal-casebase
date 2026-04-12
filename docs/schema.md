@@ -1,6 +1,6 @@
 # Legal Casebase — Working Schema Document
 
-**Version:** v0.7  
+**Version:** v0.8  
 **Status:** In Review  
 **Purpose:** This is the shared schema working document for Shobhit, ChatGPT, and Claude. It is meant to record:
 1. what was explored,
@@ -282,7 +282,7 @@ Reason:
 - recent and older opinions do not behave consistently enough for a single-field assumption.
 
 ### 5.6 Raw preservation strategy
-**Locked for MVP:** raw JSON files on disk under `data/raw/`
+**Locked for MVP:** raw JSON files on disk under `storage/raw/`
 
 Reason:
 - simplest sprint-friendly protection against normalization mistakes,
@@ -513,7 +513,7 @@ Reason for nullable targets:
 These are operational rules that are now treated as part of the schema contract for the MVP.
 
 #### 7.6.1 Raw preservation
-- Save raw CourtListener payloads to `data/raw/` before normalization.
+- Save raw CourtListener payloads to `storage/raw/` before normalization.
 - Preserve dockets, clusters, and opinions as source snapshots so normalization can be rerun without re-fetching.
 
 #### 7.6.2 Source-to-table mapping
@@ -625,3 +625,4 @@ out of scope for MVP.
 - **v0.5** — added locked MVP ingestion rules to the schema document, covering raw preservation, source-to-table mapping, `clean_text` derivation, chunk creation, citation ingestion, blocked/privacy handling, and the intended ordering of chunk insertion versus embedding/index generation.
 - **v0.6** — aligned the recommended MVP schema with the locked lean SQL baseline: trimmed low-value provenance fields, kept source/identity provenance that supports traceability and ingestion correctness, and updated the immediate next step now that the SQL schema is locked.
 - **v0.7** — added first-reader clarifications explaining that `cases` is the normalized case-level table built from CourtListener dockets, and documented the meaning of fields like `blocked`, `source_code`, `text_source`, `date_ingested`, and `source_*_id`.
+- **v0.8** — updated raw-payload storage paths from `data/raw/` to `storage/raw/` to match the restructured project layout.
