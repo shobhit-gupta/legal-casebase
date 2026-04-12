@@ -46,7 +46,7 @@ At the MVP level, the system is being designed with a **normalization-first** ap
 - semantic/vector search
 - hybrid retrieval
 - result snippets with metadata and traceability
-- document detail pages
+- case detail pages
 
 ### Later / optional
 - grounded case summary
@@ -66,21 +66,19 @@ Current implementation direction:
 
 ## Repository structure
 
-Planned / current structure:
+Current structure:
 
 ```text
 legal-casebase/
-├── app/                  # FastAPI app
+├── app/                  # FastAPI app and database helper
+├── db/                   # Database schema definition
+│   └── schema.sql
+├── docs/                 # Architecture + schema working docs
 ├── scripts/              # Fetching, normalization, ingestion, indexing scripts
-├── data/
-│   ├── raw/              # Raw source payload snapshots
-│   ├── processed/        # Normalized/intermediate outputs
-│   └── casebase.db       # SQLite database
-├── index/
-│   └── faiss/            # Vector index files
-├── docs/
-│   ├── architecture.md   # Architecture decision document
-│   └── schema.md         # Schema exploration / working schema doc
+├── storage/              # Runtime artifacts (DB, raw payloads, vector index)
+│   ├── sqlite/
+│   ├── raw/
+│   └── faiss/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
@@ -112,20 +110,22 @@ The search flow is currently planned as:
 
 1. fetch and preserve raw source payloads
 2. normalize dockets / clusters / opinions
-3. clean and chunk opinion text
-4. index keyword search in SQLite FTS5
-5. generate embeddings for chunks
-6. index vectors in FAISS
-7. run keyword + semantic retrieval
-8. fuse results using hybrid ranking
-9. render case-grounded results with metadata and source links
+3. derive `clean_text` using the locked text-source priority
+4. chunk opinion text
+5. index keyword search in SQLite FTS5
+6. generate embeddings for chunks
+7. index vectors in FAISS
+8. run keyword + semantic retrieval
+9. fuse results using hybrid ranking
+10. render case-grounded results with metadata and source links
 
 ## Documentation
 
 The main design docs live in `docs/`:
 
-- `docs/architecture.md` — architecture decisions, tradeoffs, build phases
-- `docs/schema.md` — CourtListener exploration findings, schema decisions, open questions
+- `docs/architecture.md` — architecture decisions, tradeoffs, and build phases
+- `docs/schema.md` — CourtListener exploration findings, schema decisions, ingestion rules, and current recommended MVP schema
+- `scripts/README.md` — script usage notes and deferred implementation ideas
 
 These docs are intended to be living documents and may evolve as more of the source data is explored.
 
@@ -137,31 +137,33 @@ Typical local workflow:
 
 ```bash
 # start the dev environment
-Docker compose up --build
+docker compose up --build
 
 # run a script inside the app container
-Docker compose run app python scripts/<script_name>.py
+docker compose run --rm app python scripts/<script_name>.py
 ```
 
-If using VS Code, the repo is also expected to support Dev Containers.
+If using VS Code, the repo also supports Dev Containers.
 
 ## Current status
 
-This project is still in active design + early implementation.
+This project is now past the initial architecture/schema exploration phase and is entering **Phase 2 — Ingestion + Indexing**.
 
-What is already being established:
+What is already established:
 - repo scaffolding
 - containerized dev environment
 - CourtListener API exploration
 - schema design
-- architecture and documentation baseline
+- locked MVP SQL schema
+- architecture and schema working docs
 
 What comes next:
-- finalize schema
-- ingest a representative corpus slice
-- build indexing pipeline
+- build the raw fetch pipeline
+- normalize a representative corpus slice into SQLite
+- chunk opinion text
+- generate embeddings and build FAISS index
 - implement search/results UI
-- add document detail page
+- add case detail pages
 - optionally add grounded AI features
 
 ## Notes on scope
@@ -187,4 +189,4 @@ TBD.
 
 ## Acknowledgment
 
-This repository is being developed through iterative design, API exploration, and architecture/schema refinement against real CourtListener data.
+This repository is being developed through iterative design, API exploration, schema refinement, and incremental implementation against real CourtListener data.
