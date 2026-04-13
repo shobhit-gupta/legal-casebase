@@ -154,7 +154,7 @@ CourtListener gives a real legal corpus and is more credible than mock data whil
 CourtListener is locked as the primary route.
 
 Initial corpus plan:
-- **Pass 1:** recent published SCOTUS cases (**2020–2026**), roughly **50–100 opinions**
+- **Pass 1:** recent published SCOTUS cases, roughly **50–100 opinions**
 - **Pass 2:** a curated set of landmark cases to add recognizability, richer citation structure, and older multi-opinion decision patterns
 
 ---
@@ -453,7 +453,7 @@ Only unresolved items belong here.
 **Status:** open
 
 **Why still open:** the initial CourtListener slice is now settled as:
-- **Pass 1:** recent published SCOTUS (**2020–2026**)
+- **Pass 1:** recent published SCOTUS, limited to 50–100 opinions
 - **Pass 2:** curated landmark cases
 
 What remains open is how aggressively the landmark pass should be expanded beyond the initial curated set.
@@ -499,4 +499,4 @@ If this document and `docs/schema.md` ever diverge temporarily, treat `docs/sche
 - **v0.2** — updated the architecture to reflect the newer CourtListener-driven model: docket as canonical case identity, cluster as thin linking layer, opinion as text/search anchor, chunk as retrieval unit; aligned UI flow and build plan with the current schema direction; added containerization as a locked architectural decision; clarified that exact SQL/schema details live in `docs/schema.md`.
 - **v0.3** — updated storage-path references to match the restructured project layout, including `storage/raw/` for raw payload preservation and `storage/` as the runtime artifact area in containerized development.
 - **v0.4** — aligned the containerization section with the current named-volume storage policy, removed duplicated bullets, and clarified that storage-writing scripts must run inside the containerized environment.
-- **v0.5** — updated the dataset section to reflect the now-settled CourtListener corpus plan: Pass 1 recent published SCOTUS (2020–2026), followed by a curated landmark-case pass; replaced the stale open question about the exact slice.
+- **v0.5** — updated the dataset section to reflect the now-settled CourtListener corpus plan: Pass 1 recent published SCOTUS, followed by a curated landmark-case pass; replaced the stale open question about the exact slice.

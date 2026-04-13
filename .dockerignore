@@ -8,3 +8,4 @@ __pycache__
 storage/sqlite/*.db
 storage/raw
 storage/faiss
+.DS_Store
