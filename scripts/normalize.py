@@ -17,6 +17,11 @@ Processing order:
     1. dockets  → cases
     2. clusters → clusters  (requires cases)
     3. opinions → opinions  (requires clusters)
+
+Testability:
+    Core logic is exposed via normalize_corpus(conn, raw_base, date_ingested).
+    Tests can pass a temporary DB connection and a fixture raw_base directory
+    without monkeypatching any globals.
 """
 
 import html as html_stdlib
@@ -31,10 +36,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.db import get_connection
 
-RAW_BASE = ROOT / "storage" / "raw" / "courtlistener"
-DOCKETS_DIR  = RAW_BASE / "dockets"
-CLUSTERS_DIR = RAW_BASE / "clusters"
-OPINIONS_DIR = RAW_BASE / "opinions"
+DEFAULT_RAW_BASE = ROOT / "storage" / "raw" / "courtlistener"
 
 
 # ── Text utilities ─────────────────────────────────────────────────────────────
@@ -85,14 +87,14 @@ def derive_clean_text(opinion_id: int, opinion: dict) -> tuple[str, str]:
 
 # ── Normalization passes ───────────────────────────────────────────────────────
 
-def normalize_cases(conn, date_ingested: str) -> dict[int, int]:
+def normalize_cases(conn, dockets_dir: Path, date_ingested: str) -> dict[int, int]:
     """
     Insert one cases row per docket file.
 
     Returns:
         source_docket_id -> normalized cases.id
     """
-    docket_files = sorted(DOCKETS_DIR.glob("*.json"))
+    docket_files = sorted(dockets_dir.glob("*.json"))
     print(f"Normalizing {len(docket_files)} dockets → cases...")
 
     docket_id_map: dict[int, int] = {}
@@ -140,7 +142,10 @@ def normalize_cases(conn, date_ingested: str) -> dict[int, int]:
 
 
 def normalize_clusters(
-    conn, date_ingested: str, docket_id_map: dict[int, int]
+    conn,
+    clusters_dir: Path,
+    date_ingested: str,
+    docket_id_map: dict[int, int],
 ) -> dict[int, tuple[int, int, str | None]]:
     """
     Insert one clusters row per cluster file.
@@ -151,7 +156,7 @@ def normalize_clusters(
     judges is carried so opinion normalization can derive author_display
     without rereading cluster files.
     """
-    cluster_files = sorted(CLUSTERS_DIR.glob("*.json"))
+    cluster_files = sorted(clusters_dir.glob("*.json"))
     print(f"Normalizing {len(cluster_files)} clusters...")
 
     cluster_id_map: dict[int, tuple[int, int, str | None]] = {}
@@ -202,6 +207,7 @@ def normalize_clusters(
 
 def normalize_opinions(
     conn,
+    opinions_dir: Path,
     date_ingested: str,
     cluster_id_map: dict[int, tuple[int, int, str | None]],
 ) -> None:
@@ -213,7 +219,7 @@ def normalize_opinions(
 
     Raises RuntimeError on missing parent cluster or no usable text.
     """
-    opinion_files = sorted(OPINIONS_DIR.glob("*.json"))
+    opinion_files = sorted(opinions_dir.glob("*.json"))
     print(f"Normalizing {len(opinion_files)} opinions...")
 
     inserted = 0
@@ -279,6 +285,53 @@ def normalize_opinions(
     print(f"  Inserted {inserted} opinions rows.")
 
 
+# ── Public API ─────────────────────────────────────────────────────────────────
+
+def normalize_corpus(
+    conn,
+    raw_base: Path,
+    date_ingested: str | None = None,
+) -> None:
+    """
+    Full reset / rebuild normalization pipeline.
+
+    Clears cases, clusters, and opinions, then re-inserts from raw JSON files
+    found under raw_base/{dockets,clusters,opinions}/.
+
+    Args:
+        conn:          Open SQLite connection (caller manages lifecycle).
+        raw_base:      Root of the raw CourtListener JSON tree.
+        date_ingested: ISO timestamp string for all inserted rows.
+                       Defaults to current UTC time if not provided.
+    """
+    if date_ingested is None:
+        date_ingested = datetime.now(timezone.utc).isoformat()
+
+    # Validate raw_base structure before touching the DB
+    missing = [
+        str(raw_base / sub)
+        for sub in ("dockets", "clusters", "opinions")
+        if not (raw_base / sub).is_dir()
+    ]
+    if missing:
+        raise RuntimeError(
+            f"normalize_corpus: required directories not found under raw_base "
+            f"({raw_base}):\n  " + "\n  ".join(missing)
+        )
+
+    print("Clearing existing normalized rows...")
+    conn.execute("DELETE FROM opinions")
+    conn.execute("DELETE FROM clusters")
+    conn.execute("DELETE FROM cases")
+    print("  Done.\n")
+
+    docket_id_map = normalize_cases(conn, raw_base / "dockets", date_ingested)
+    print()
+    cluster_id_map = normalize_clusters(conn, raw_base / "clusters", date_ingested, docket_id_map)
+    print()
+    normalize_opinions(conn, raw_base / "opinions", date_ingested, cluster_id_map)
+
+
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -286,17 +339,7 @@ def main() -> None:
     print(f"\nNormalizing corpus — run timestamp: {date_ingested}\n")
 
     with get_connection() as conn:
-        print("Clearing existing normalized rows...")
-        conn.execute("DELETE FROM opinions")
-        conn.execute("DELETE FROM clusters")
-        conn.execute("DELETE FROM cases")
-        print("  Done.\n")
-
-        docket_id_map = normalize_cases(conn, date_ingested)
-        print()
-        cluster_id_map = normalize_clusters(conn, date_ingested, docket_id_map)
-        print()
-        normalize_opinions(conn, date_ingested, cluster_id_map)
+        normalize_corpus(conn, DEFAULT_RAW_BASE, date_ingested)
 
     print("\nNormalization complete.")
 
