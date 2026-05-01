@@ -79,6 +79,57 @@ def stats():
     }
 
 
+@app.get("/cases/{case_id}")
+def case_detail(case_id: int):
+    _OPINION_ORDER = """
+        CASE opinion_type
+            WHEN '010combined'  THEN 1
+            WHEN '010majority'  THEN 2
+            WHEN '020plurality' THEN 3
+            WHEN '030concurring-in-part-and-dissenting-in-part' THEN 4
+            WHEN '040concurrence' THEN 5
+            WHEN '050dissent'   THEN 6
+            ELSE                     7
+        END, id ASC
+    """
+    try:
+        with get_connection() as conn:
+            case_row = conn.execute(
+                "SELECT * FROM cases WHERE id = ?", (case_id,)
+            ).fetchone()
+
+            if case_row is None:
+                raise HTTPException(status_code=404, detail="Case not found")
+
+            opinion_rows = conn.execute(
+                f"SELECT * FROM opinions WHERE case_id = ? ORDER BY {_OPINION_ORDER}",
+                (case_id,),
+            ).fetchall()
+
+            opinion_ids = [r["id"] for r in opinion_rows]
+            if opinion_ids:
+                placeholders = ", ".join("?" * len(opinion_ids))
+                citation_rows = conn.execute(
+                    f"SELECT * FROM citations WHERE from_opinion_id IN ({placeholders})"
+                    " ORDER BY from_opinion_id ASC, id ASC",
+                    opinion_ids,
+                ).fetchall()
+            else:
+                citation_rows = []
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Case detail query failed for case_id=%s", case_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    return {
+        "case": dict(case_row),
+        "opinions": [dict(r) for r in opinion_rows],
+        "citations": [dict(r) for r in citation_rows],
+    }
+
+
 @app.get("/search")
 def search(
     query: str = Query(..., description="Search query"),

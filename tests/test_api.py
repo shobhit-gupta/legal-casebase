@@ -4,12 +4,14 @@ tests/test_api.py
 Tests for the legal casebase FastAPI endpoints:
   - GET /search
   - GET /stats
+  - GET /cases/{case_id}
+
 Patches app.main.search_casebase and app.main.get_connection so no
 real DB or network calls are needed.
 """
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -55,20 +57,14 @@ class TestSearchEndpoint(unittest.TestCase):
         self.assertEqual(body["mode"], "hybrid")
         self.assertEqual(body["count"], 1)
         self.assertEqual(len(body["results"]), 1)
-        # Verify search_casebase was called with the expected arguments
         mock_search.assert_called_once_with(query="copyright", limit=10, mode="hybrid")
-        # Spot-check one stable field in results
         self.assertEqual(body["results"][0]["chunk_id"], 1)
 
     def test_missing_query_returns_422(self):
-        # No patch — testing framework-level required-parameter enforcement.
-        # query is required at the FastAPI layer; missing it must return 422.
         resp = client.get("/search")
         self.assertEqual(resp.status_code, 422)
 
     def test_invalid_limit_returns_400(self):
-        # limit=0 must reach retrieval and surface as 400 via ValueError,
-        # not be rejected by FastAPI as 422.
         with patch(
             "app.main.search_casebase",
             side_effect=ValueError("Limit must be > 0, got 0."),
@@ -107,7 +103,6 @@ class TestSearchEndpoint(unittest.TestCase):
         ):
             resp = client.get("/search", params={"query": "test"})
         self.assertEqual(resp.status_code, 500)
-        # Internal error detail must be hidden from the client
         self.assertEqual(resp.json()["detail"], "Internal search error")
 
 
@@ -117,8 +112,6 @@ class TestStatsEndpoint(unittest.TestCase):
         Return a context-manager mock whose execute().fetchone()
         returns each count in sequence across the three COUNT queries.
         """
-        from unittest.mock import MagicMock
-
         mock_ctx = MagicMock()
         conn = mock_ctx.return_value.__enter__.return_value
         conn.execute.return_value.fetchone.side_effect = [[c] for c in counts]
@@ -137,11 +130,9 @@ class TestStatsEndpoint(unittest.TestCase):
 
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
-        # DB-derived counts must match the mocked values exactly
         self.assertEqual(body["cases"], 10)
         self.assertEqual(body["opinions"], 20)
         self.assertEqual(body["chunks_indexed"], 30)
-        # Stable constants
         self.assertEqual(body["court"], "U.S. Supreme Court")
         self.assertEqual(body["source"], "CourtListener")
         self.assertEqual(body["retrieval_modes"], ["fts", "vector", "hybrid"])
@@ -166,6 +157,55 @@ class TestStatsEndpoint(unittest.TestCase):
         """If the DB is unavailable, /stats returns 500 with a generic message."""
         with patch("app.main.get_connection", side_effect=Exception("DB unavailable")):
             resp = client.get("/stats")
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(resp.json()["detail"], "Internal server error")
+
+
+class TestCaseDetailEndpoint(unittest.TestCase):
+    def _mock_case_conn(self, case_row, opinion_rows, citation_rows):
+        """
+        Return a context-manager mock that serves fetchone() then two fetchall() calls
+        in the order the endpoint issues them: case → opinions → citations.
+        """
+        mock_ctx = MagicMock()
+        conn = mock_ctx.return_value.__enter__.return_value
+        conn.execute.return_value.fetchone.return_value = case_row
+        conn.execute.return_value.fetchall.side_effect = [opinion_rows, citation_rows]
+        return mock_ctx
+
+    def test_case_detail_success(self):
+        fake_case = {"id": 5, "case_name": "Test v. Case", "docket_number": "24-001"}
+        fake_opinion = {"id": 1, "case_id": 5, "opinion_type": "010combined"}
+        fake_citation = {"id": 1, "from_opinion_id": 1, "to_opinion_id": None}
+
+        with patch(
+            "app.main.get_connection",
+            self._mock_case_conn(fake_case, [fake_opinion], [fake_citation]),
+        ):
+            resp = client.get("/cases/5")
+
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        # Top-level keys present
+        for key in ("case", "opinions", "citations"):
+            self.assertIn(key, body)
+        # Actual values match the mocked data
+        self.assertEqual(body["case"]["id"], 5)
+        self.assertEqual(len(body["opinions"]), 1)
+        self.assertEqual(len(body["citations"]), 1)
+        self.assertEqual(body["opinions"][0]["opinion_type"], "010combined")
+
+    def test_case_detail_not_found(self):
+        with patch("app.main.get_connection") as mock_conn:
+            conn = mock_conn.return_value.__enter__.return_value
+            conn.execute.return_value.fetchone.return_value = None
+            resp = client.get("/cases/9999")
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json()["detail"], "Case not found")
+
+    def test_case_detail_db_failure_returns_500(self):
+        with patch("app.main.get_connection", side_effect=Exception("DB error")):
+            resp = client.get("/cases/1")
         self.assertEqual(resp.status_code, 500)
         self.assertEqual(resp.json()["detail"], "Internal server error")
 
