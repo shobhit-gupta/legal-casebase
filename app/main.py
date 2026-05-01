@@ -8,6 +8,9 @@ from fastapi import FastAPI, HTTPException, Query
 from app.db import get_connection, init_db
 from app.retrieval import EMBEDDING_MODEL, search_casebase
 
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
 logger = logging.getLogger(__name__)
 
 _FAISS_META_PATH = (
@@ -44,6 +47,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Legal Casebase", lifespan=lifespan)
+
+
+app.mount("/ui", StaticFiles(directory="frontend_proto", html=True), name="ui")
+
+
+@app.get("/ui")
+def ui_redirect():
+    return RedirectResponse(url="/ui/")
 
 
 @app.get("/")
