@@ -60,8 +60,8 @@ const StatsCard = () => {
         </div>
       )}
 
-      <div className="stats-foot">
-        GET /stats &nbsp;·&nbsp; modes:&nbsp;
+      <div className="stats-foot" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        GET /stats &nbsp;·&nbsp;
         {stats ? stats.retrieval_modes.join(" · ") : "fts · vector · hybrid"}
       </div>
     </div>
@@ -116,59 +116,62 @@ const Homepage = ({ onSearch }) => {
   return (
     <div style={{ minHeight: "calc(100vh - 56px)", display: "flex", flexDirection: "column" }}>
       <main className="home-main" style={{ flex: 1, maxWidth: 1080, width: "100%", margin: "0 auto", padding: "96px 32px 0" }}>
-        <div style={{ maxWidth: 720, marginBottom: 32 }}>
-          <div className="eyebrow" style={{ marginBottom: 14 }}>U.S. Supreme Court · CourtListener</div>
-          <h1 className="home-h1" style={{
-            fontFamily: "var(--serif)",
-            fontWeight: 400,
-            fontSize: 38,
-            lineHeight: 1.18,
-            letterSpacing: "-0.012em",
-            margin: "0 0 14px",
-            color: "var(--ink)",
-            textWrap: "pretty",
-          }}>
-            A small, traceable casebase
-            <span style={{ color: "var(--ink-4)" }}> for searching legal opinions.</span>
-          </h1>
-          <p style={{ color: "var(--ink-3)", fontSize: 15, lineHeight: 1.55, margin: 0, maxWidth: 580, textWrap: "pretty" }}>
-            Keyword, semantic, and hybrid retrieval over chunked opinion text. Every result links
-            back to its case, opinion, chunk, and character offsets.
-          </p>
-        </div>
+        {/* Single inner content wrapper — aligns hero, search bar, and lower row */}
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ marginBottom: 32 }}>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>U.S. Supreme Court · CourtListener</div>
+            <h1 className="home-h1" style={{
+              fontFamily: "var(--serif)",
+              fontWeight: 400,
+              fontSize: 38,
+              lineHeight: 1.18,
+              letterSpacing: "-0.012em",
+              margin: "0 0 14px",
+              color: "var(--ink)",
+              textWrap: "pretty",
+            }}>
+              A small, traceable casebase
+              <span style={{ color: "var(--ink-4)" }}> for searching legal opinions.</span>
+            </h1>
+            <p style={{ color: "var(--ink-3)", fontSize: 15, lineHeight: 1.55, margin: 0, maxWidth: 580, textWrap: "pretty" }}>
+              Keyword, semantic, and hybrid retrieval over chunked opinion text. Every result links
+              back to its case, opinion, chunk, and character offsets.
+            </p>
+          </div>
 
-        <div style={{ maxWidth: 720 }}>
-          <SearchField
-            query={query}
-            setQuery={setQuery}
-            mode={mode}
-            setMode={setMode}
-            onSubmit={() => submit()}
-            autoFocus
-          />
+          <div>
+            <SearchField
+              query={query}
+              setQuery={setQuery}
+              mode={mode}
+              setMode={setMode}
+              onSubmit={() => submit()}
+              autoFocus
+            />
 
-          <div style={{
-            display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
-            marginTop: 10, fontSize: 12, color: "var(--ink-4)",
-          }}>
-            <div>
-              <span className="kbd">/</span> to focus &nbsp;·&nbsp;
-              <span className="kbd">⏎</span> to search
+            <div style={{
+              display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
+              marginTop: 10, fontSize: 12, color: "var(--ink-4)",
+            }}>
+              <div>
+                <span className="kbd">/</span> to focus &nbsp;·&nbsp;
+                <span className="kbd">⏎</span> to search
+              </div>
+              <div style={{ fontFamily: "var(--mono)" }}>
+                GET /search?mode={mode}
+              </div>
             </div>
-            <div style={{ fontFamily: "var(--mono)" }}>
-              GET /search?mode={mode}
-            </div>
+          </div>
+
+          {/* Examples + corpus stats — share the same 720px inner width */}
+          <div className="home-grid">
+            <ExampleQueries onPick={(q, m) => submit(q, m)} />
+            <StatsCard />
           </div>
         </div>
 
-        {/* Examples + corpus stats — side by side on desktop, stacked on mobile */}
-        <div className="home-grid">
-          <ExampleQueries onPick={(q, m) => submit(q, m)} />
-          <StatsCard />
-        </div>
-
         {/* About — static, no fake numbers */}
-        <section style={{ marginTop: 56, paddingBottom: 64, maxWidth: 680 }}>
+        <section style={{ marginTop: 56, paddingBottom: 64, maxWidth: 680, margin: "56px auto 0" }}>
           <div className="eyebrow" style={{ marginBottom: 12 }}>About this prototype</div>
           <p style={{ color: "var(--ink-3)", fontSize: 13.5, lineHeight: 1.65, margin: 0, textWrap: "pretty" }}>
             Search runs against a normalized SCOTUS slice from CourtListener:
