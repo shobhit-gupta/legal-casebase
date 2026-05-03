@@ -4,12 +4,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.db import get_connection, init_db
 from app.retrieval import EMBEDDING_MODEL, search_casebase
-
-from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)
 
@@ -47,19 +46,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Legal Casebase", lifespan=lifespan)
-
-
-app.mount("/ui", StaticFiles(directory="frontend_proto", html=True), name="ui")
-
-
-@app.get("/ui")
-def ui_redirect():
-    return RedirectResponse(url="/ui/")
-
-
-@app.get("/")
-def root():
-    return {"message": "Legal Casebase is running"}
 
 
 @app.get("/health")
@@ -164,3 +150,14 @@ def search(
         "count": len(results),
         "results": results,
     }
+
+
+app.mount("/ui", StaticFiles(directory="frontend_proto", html=True), name="ui")
+
+
+@app.get("/ui")
+def ui_redirect():
+    return RedirectResponse(url="/ui/")
+
+
+app.mount("/", StaticFiles(directory="frontend_proto", html=True), name="frontend")
