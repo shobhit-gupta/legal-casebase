@@ -11,15 +11,15 @@
  */
 
 const OPINION_TONE = {
-  majority:    { label: "Majority",     tone: "neutral" },
-  combined:    { label: "Opinion",      tone: "neutral" },
-  plurality:   { label: "Plurality",    tone: "neutral" },
-  concurrence: { label: "Concurrence",  tone: "concur"  },
+  majority: { label: "Majority", tone: "neutral" },
+  combined: { label: "Opinion", tone: "neutral" },
+  plurality: { label: "Plurality", tone: "neutral" },
+  concurrence: { label: "Concurrence", tone: "concur" },
   "concurrence-in-part": { label: "Concurrence in part", tone: "concur" },
-  dissent:     { label: "Dissent",      tone: "dissent" },
+  dissent: { label: "Dissent", tone: "dissent" },
   "dissent-in-part": { label: "Dissent in part", tone: "dissent" },
   "concurrence-in-part-and-dissent-in-part": { label: "Concur/Dissent", tone: "split" },
-  seriatim:    { label: "Seriatim",     tone: "neutral" },
+  seriatim: { label: "Seriatim", tone: "neutral" },
 };
 
 function opinionTone(code) {
@@ -29,10 +29,10 @@ function opinionTone(code) {
 }
 
 const TONE_STYLE = {
-  neutral: { color: "var(--ink-2)",     border: "var(--rule)",        bg: "var(--paper)"   },
-  concur:  { color: "var(--signal-vec)", border: "var(--signal-vec)", bg: "var(--signal-vec-bg)" },
+  neutral: { color: "var(--ink-2)", border: "var(--rule)", bg: "var(--paper)" },
+  concur: { color: "var(--signal-vec)", border: "var(--signal-vec)", bg: "var(--signal-vec-bg)" },
   dissent: { color: "var(--signal-fts)", border: "var(--signal-fts)", bg: "var(--signal-fts-bg)" },
-  split:   { color: "var(--ink-2)",     border: "var(--rule)",        bg: "var(--paper-2)" },
+  split: { color: "var(--ink-2)", border: "var(--rule)", bg: "var(--paper-2)" },
 };
 
 /* ── Pieces ──────────────────────────────────────────────────── */
@@ -114,7 +114,7 @@ const OpinionBody = ({ text }) => {
         // Heading-y if short and mostly CAPS (e.g. "I", "II", section headers).
         const isHead =
           t.length < 80 &&
-          /^[IVX]+\.?$/.test(t.replace(/\s+/g, "")) === false
+            /^[IVX]+\.?$/.test(t.replace(/\s+/g, "")) === false
             ? false
             : true;
         const isRoman = /^[IVX]+\.?$/.test(t.replace(/\s+/g, ""));
@@ -182,7 +182,7 @@ const CaseDetail = ({ caseId, onHome, onBackToResults, lastSearch }) => {
       .then((res) => {
         if (cancelled) return;
         setData(res);
-        setActiveOpId(res.primary_opinion_id);
+        setActiveOpId(res.opinions[0]?.id ?? null);
         setLoading(false);
       })
       .catch((err) => {
@@ -313,15 +313,15 @@ const CaseDetail = ({ caseId, onHome, onBackToResults, lastSearch }) => {
               display: "grid", gridTemplateColumns: "auto 1fr",
               columnGap: 14, rowGap: 8, margin: 0,
             }}>
-              <MetaRow k="Court"      v={window.courtLabel(c.court_id)} />
-              <MetaRow k="Docket"     v={c.docket_number} mono />
-              <MetaRow k="Filed"      v={window.formatDate(c.date_filed)} mono />
-              <MetaRow k="Argued"     v={window.formatDate(c.date_argued)} mono />
+              <MetaRow k="Court" v={window.courtLabel(c.court_id)} />
+              <MetaRow k="Docket" v={c.docket_number} mono />
+              <MetaRow k="Filed" v={window.formatDate(c.date_filed)} mono />
+              <MetaRow k="Argued" v={window.formatDate(c.date_argued)} mono />
               <MetaRow k="Appeal from" v={c.appeal_from_str} />
               {c.originating_docket_number && (
                 <MetaRow k="Below" v={c.originating_docket_number} mono />
               )}
-              <MetaRow k="Audio"      v={c.has_audio ? "available at source" : "none"} />
+              <MetaRow k="Audio" v={c.has_audio ? "available at source" : "none"} />
             </dl>
           </section>
 
@@ -333,10 +333,10 @@ const CaseDetail = ({ caseId, onHome, onBackToResults, lastSearch }) => {
               background: "var(--paper-2)", padding: "10px 12px",
               border: "1px solid var(--rule)",
             }}>
-{`GET /cases/${c.id}
+              {`GET /cases/${c.id}
 
 → ${opinions.length} opinion${opinions.length === 1 ? "" : "s"}
-  primary = ${data.primary_opinion_id}`}
+  active = ${activeOpId}`}
             </pre>
           </section>
 
@@ -346,13 +346,13 @@ const CaseDetail = ({ caseId, onHome, onBackToResults, lastSearch }) => {
               display: "grid", gridTemplateColumns: "auto 1fr",
               columnGap: 14, rowGap: 8, margin: 0,
             }}>
-              <MetaRow k="Source"    v={`docket ${c.source_docket_id}`} mono />
-              <MetaRow k="Slug"      v={c.slug} mono />
-              <MetaRow k="Ingested"  v={window.formatDate(c.date_ingested)} mono />
+              <MetaRow k="Source" v={`docket ${c.source_docket_id}`} mono />
+              <MetaRow k="Slug" v={c.slug} mono />
+              <MetaRow k="Ingested" v={window.formatDate(c.date_ingested)} mono />
             </dl>
           </section>
 
-          {/* Citations stay quiet until the API actually populates them. */}
+          {/* Citations — empty for most current corpus cases. */}
           <section style={{ marginTop: 26 }}>
             <div className="eyebrow" style={{ marginBottom: 10 }}>Citations</div>
             {data.citations && data.citations.length > 0 ? (
@@ -368,7 +368,7 @@ const CaseDetail = ({ caseId, onHome, onBackToResults, lastSearch }) => {
                 margin: 0, fontFamily: "var(--mono)", fontSize: 11.5,
                 color: "var(--ink-4)", lineHeight: 1.55,
               }}>
-                None linked yet. Cited-by graph will appear here once extracted.
+                No citations on record.
               </p>
             )}
           </section>
@@ -396,7 +396,6 @@ const CaseDetail = ({ caseId, onHome, onBackToResults, lastSearch }) => {
                 <div className="eyebrow" style={{ marginBottom: 6 }}>
                   {opinionTone(activeOp.opinion_type).label}
                   {activeOp.per_curiam && " · per curiam"}
-                  {activeOp.id === data.primary_opinion_id && opinions.length > 1 && " · primary"}
                 </div>
                 <div style={{
                   fontFamily: "var(--serif)", fontSize: 20, fontWeight: 500,

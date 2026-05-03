@@ -51,7 +51,7 @@ const StatsCard = () => {
           <span className="v" style={{ fontSize: 11.5 }}>{stats ? stats.source : "—"}</span>
 
           <span className="k">Vector dim</span>
-          <span className="v">{stats ? stats.vector_dimension.toLocaleString() : "—"}</span>
+          <span className="v">{stats?.vector_dimension != null ? stats.vector_dimension.toLocaleString() : "—"}</span>
 
           <span className="k">Embedding</span>
           <span className="v" style={{ fontSize: 11, whiteSpace: "nowrap" }}>

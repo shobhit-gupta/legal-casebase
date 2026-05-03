@@ -15,24 +15,15 @@
 <body>
   <div id="root"></div>
 
-  <script src="data.js?v=2"></script>
+  <script src="exampleQueries.js?v=2"></script>
   <script src="searchApi.js?v=2"></script>
   <script src="caseApi.js?v=1"></script>
-  <script type="text/babel" src="tweaks-panel.jsx?v=2"></script>
   <script type="text/babel" src="components/atoms.jsx?v=2"></script>
   <script type="text/babel" src="components/Homepage.jsx?v=2"></script>
   <script type="text/babel" src="components/Results.jsx?v=2"></script>
   <script type="text/babel" src="components/CaseDetail.jsx?v=1"></script>
 
   <script type="text/babel">
-    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-      "serifAccent": "source-serif",
-      "density": "comfortable",
-      "showScores": true,
-      "snippetStyle": "plain",
-      "accentHue": 255
-    }/*EDITMODE-END*/;
-
     function parseHash() {
       const h = window.location.hash || "";
       // #/case/{id}
@@ -50,7 +41,6 @@
 
     function App() {
       const [state, setState] = React.useState(parseHash());
-      const [tweaks, setTweak] = (window.useTweaks || (() => [TWEAK_DEFAULTS, () => {}]))(TWEAK_DEFAULTS);
 
       React.useEffect(() => {
         const onHash = () => setState(parseHash());
@@ -69,14 +59,6 @@
           window.removeEventListener("keydown", onKey);
         };
       }, []);
-
-      // apply tweaks via CSS variables
-      React.useEffect(() => {
-        document.documentElement.style.setProperty("--accent",
-          `oklch(0.42 0.10 ${tweaks.accentHue})`);
-        document.documentElement.style.setProperty("--accent-soft",
-          `oklch(0.94 0.02 ${tweaks.accentHue})`);
-      }, [tweaks.accentHue]);
 
       const [lastSearch, setLastSearch] = React.useState(null);
 
@@ -100,7 +82,7 @@
       };
 
       return (
-        <div data-density={tweaks.density} data-snippet={tweaks.snippetStyle}>
+        <div>
           <Topbar view={state.view} onNavigate={(v) => v === "home" ? goHome() : null} />
           {state.view === "home" && (
             <Homepage onSearch={goSearch} onOpenCase={goCase} />
@@ -112,7 +94,7 @@
               onSearch={goSearch}
               onHome={goHome}
               onOpenCase={goCase}
-              showScores={tweaks.showScores}
+              showScores={true}
             />
           )}
           {state.view === "case" && (
@@ -123,61 +105,9 @@
               lastSearch={lastSearch}
             />
           )}
-
-          {/* Tweaks panel — only shows when host activates Tweaks */}
-          {window.TweaksPanel && (
-            <TweaksPanel title="Tweaks">
-              <TweakSection title="Layout">
-                <TweakRadio
-                  label="Density"
-                  value={tweaks.density}
-                  options={[
-                    { value: "compact", label: "Compact" },
-                    { value: "comfortable", label: "Roomy" },
-                  ]}
-                  onChange={(v) => setTweak("density", v)}
-                />
-                <TweakRadio
-                  label="Snippet style"
-                  value={tweaks.snippetStyle}
-                  options={[
-                    { value: "rule", label: "Quote rule" },
-                    { value: "plain", label: "Plain" },
-                    { value: "card", label: "Card" },
-                  ]}
-                  onChange={(v) => setTweak("snippetStyle", v)}
-                />
-                <TweakToggle
-                  label="Show retrieval scores"
-                  value={tweaks.showScores}
-                  onChange={(v) => setTweak("showScores", v)}
-                />
-              </TweakSection>
-              <TweakSection title="Color">
-                <TweakSlider
-                  label="Accent hue"
-                  value={tweaks.accentHue}
-                  min={0} max={360} step={5}
-                  onChange={(v) => setTweak("accentHue", v)}
-                />
-              </TweakSection>
-            </TweaksPanel>
-          )}
         </div>
       );
     }
-
-    // density + snippet style hooks via CSS attribute selectors
-    const styleEl = document.createElement("style");
-    styleEl.textContent = `
-      [data-density="compact"] .result-row { padding: 12px 24px 12px !important; }
-      [data-density="compact"] .result-row p { margin-bottom: 8px !important; font-size: 13.5px !important; }
-      [data-snippet="plain"] .result-row p { border-left: 0 !important; padding-left: 0 !important; }
-      [data-snippet="card"] .result-row p {
-        border-left: 0 !important; background: var(--paper-2); padding: 12px 14px !important;
-      }
-    `;
-    document.head.appendChild(styleEl);
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   </script>
