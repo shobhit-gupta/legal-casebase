@@ -1,0 +1,17 @@
+{
+  "artifact": "chunks",
+  "artifact_version": 1,
+  "embedding_model": "text-embedding-3-small",
+  "embedding_dimension": 1536,
+  "vector_dtype": "float32",
+  "id_dtype": "int64",
+  "faiss_index_type": "IndexFlatIP",
+  "metric": "cosine_via_normalized_inner_product",
+  "normalized": true,
+  "source_table": "chunks",
+  "source_text_column": "text",
+  "source_id_column": "id",
+  "build_order": "id ASC",
+  "chunk_count": 7589,
+  "rebuilt_at": "2026-04-26T15:10:09.960423+00:00"
+}

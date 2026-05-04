@@ -8,6 +8,10 @@ __pycache__/
 
 # Runtime storage
 storage/sqlite/*.db
+storage/sqlite/*.db-*
+storage/sqlite/*.db-wal
+storage/sqlite/*.db-shm
+storage/sqlite/*.db-journal
 storage/raw/*
 storage/faiss/*
 
@@ -22,5 +26,9 @@ storage/faiss/*
 
 # Experimentation
 docs/api_exploration
+
+# Local scratch files
 temp/
 tmp/
+master_prompt.md
+potus.json
