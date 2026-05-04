@@ -19,17 +19,23 @@ const Topbar = ({ view, onNavigate }) => (
         <Logo />
       </a>
       <nav className="topbar-nav" aria-label="primary">
-        <a
+        {/* <a
           href="#/"
           className={view === "home" ? "active" : ""}
           onClick={(e) => { e.preventDefault(); onNavigate("home"); }}
-        >Search</a>
+        >Search</a> */}
         <a
           href="https://github.com/shobhit-gupta/legal-casebase"
           target="_blank"
           rel="noopener"
           style={{ fontFamily: "var(--mono)", fontSize: 12 }}
         >Repo ↗</a>
+        <a
+          href="https://drive.google.com/file/d/1b9dazY2dBtmEKXtglZLMMcCTzGwkG0M3/view?usp=sharing"
+          target="_blank"
+          rel="noopener"
+          style={{ fontFamily: "var(--mono)", fontSize: 12 }}
+        >My CV ↗</a>
       </nav>
     </div>
     <div className="topbar-meta">
@@ -114,7 +120,7 @@ const MatchChip = ({ matched_by }) => {
   const cls = matched_by === "both" ? "both" : matched_by === "fts" ? "fts" : "vector";
   const label = matched_by === "both" ? "keyword + semantic"
     : matched_by === "fts" ? "keyword"
-    : "semantic";
+      : "semantic";
   return (
     <span className={"match-chip " + cls} title={`matched_by = ${matched_by}`}>
       <span className="match-chip-dot" />{label}
