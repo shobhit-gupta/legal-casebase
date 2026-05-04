@@ -4,9 +4,9 @@
  */
 
 const EXAMPLE_QUERIES = [
-  { q: "potus", hint: "keyword", mode: "hybrid" },
-  { q: "qualified immunity", hint: "doctrine", mode: "hybrid" },
+  { q: "qualified immunity", hint: "legal doctrine", mode: "hybrid" },
   { q: "when can police search a phone", hint: "natural language", mode: "vector" },
+  { q: "probable cause", hint: "legal phrase", mode: "fts" },
 ];
 
 window.EXAMPLE_QUERIES = EXAMPLE_QUERIES;
