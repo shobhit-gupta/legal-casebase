@@ -1,9 +1,9 @@
 # Legal Casebase Prototype — Architecture Decision Document
 
-**Version:** v0.5  
-**Status:** Draft / In Review  
+**Version:** v0.6  
+**Status:** Implemented MVP / In Review  
 **Audience:** First-time reader, reviewer, and builders  
-**Purpose:** Explain what we are building, why this design was chosen, what was rejected, what is still open, and how the system is expected to evolve during the MVP build.
+**Purpose:** Explain what we are building, why this design was chosen, what was rejected, what is still open, and how the system is expected to evolve during and after the MVP build.
 
 This document is the **architecture baseline**. For exact data-model findings and current schema direction based on CourtListener exploration, see `docs/schema.md`.
 
@@ -81,21 +81,26 @@ This section records decisions that are currently locked.
 **Decision**
 
 - **Backend:** FastAPI
-- **UI:** Jinja2 templates
-- **Frontend styling:** minimal CSS or Tailwind CDN
-- **No SPA / no React**
+- **UI:** static React prototype served by FastAPI
+- **Frontend styling:** minimal custom CSS
+- **Frontend build pipeline:** intentionally avoided for the MVP
 
 **Why chosen**
 
-This stack is fast to build, easy to explain, and keeps focus on retrieval and document presentation instead of frontend complexity.
+The original architecture favored Jinja2 to avoid frontend complexity. During implementation, the project adopted a small static React prototype because it improved the demo experience while still avoiding a separate frontend build system, package manager, or deployment service.
+
+The current frontend is served directly by FastAPI from `frontend_proto/`. This preserves a simple single-service deployment while allowing a richer search/results/case-detail interface.
 
 **Alternatives considered**
 
-- React / SPA frontend
+- Jinja2 templates
+- full React / Next.js SPA with a build pipeline
 
-**Why not chosen**
+**Why not chosen now**
 
-A SPA adds build and state-management overhead without improving core demo value for this prototype.
+Jinja2 remains simpler, but the static React prototype produced a better demo interface without materially increasing deployment complexity.
+
+A full SPA or Next.js frontend would add build, routing, state-management, and hosting complexity that is not justified for this MVP.
 
 ---
 
@@ -163,27 +168,32 @@ Initial corpus plan:
 
 **Decision**
 
-Use **soft section-aware chunking**:
+Use **paragraph-first chunking** for the implemented MVP:
 
-1. use headings/sections when detectable
-2. otherwise fall back to paragraph-group chunking
-3. only then fall back to fixed-size windows
+1. split opinion `clean_text` into paragraph spans
+2. group spans into chunks around a target size
+3. enforce a hard maximum chunk size
+4. use overlapping character windows between chunks
+5. set `section_hint = NULL` for now
 
 **Why chosen**
 
-This preserves legal structure where possible, produces better snippets, improves traceability, and makes later grounded AI features easier.
+Paragraph-first chunking is simple, deterministic, and sufficient for the deployed prototype. It keeps the retrieval pipeline moving without requiring fragile legal-section parsing across inconsistent source documents.
 
 **Alternatives considered**
 
+- soft section-aware chunking
 - pure fixed-size chunking
 
-**Why not chosen**
+**Why not chosen now**
 
-Pure fixed windows are simpler but weaken provenance and make results feel less like a real legal casebase.
+Section-aware chunking remains attractive because it can improve provenance and snippet quality, but it is deferred until the source structure can be handled reliably.
+
+Pure fixed windows are simpler but can split legal reasoning awkwardly and weaken readability.
 
 **Current stance**
 
-Chunking is section-aware by default, but implemented pragmatically so complexity does not explode when sections vary in length or source structure is inconsistent.
+The implemented MVP uses paragraph-first chunking. Section-aware chunking is a future improvement, not the current baseline.
 
 ---
 
@@ -240,15 +250,23 @@ The schema and retrieval pipeline should make later additions like grounded summ
 
 **Decision**
 
-Deployment is part of the plan and should happen **early, after Phase 2**, not only at the very end.
+The prototype is deployed as a Docker-based FastAPI service on Render.
+
+**Current deployment shape**
+
+- one web service
+- FastAPI serves both the API and static frontend
+- prebuilt SQLite and FAISS demo artifacts are committed for the hosted demo
+- `OPENAI_API_KEY` is provided through Render environment variables
+- no ingestion/indexing scripts run during Render startup
 
 **Why chosen**
 
-Early deployment improves confidence, exposes environment issues sooner, and produces a live URL earlier in the build.
+The hosted demo should start quickly and avoid runtime ingestion/indexing work. Committing the small prebuilt demo artifacts keeps deployment simple and avoids requiring a persistent disk or startup indexing job.
 
 **Guardrail**
 
-Deployment must not distort the architecture or delay core search quality work. Local functionality still comes first; deployment follows once ingestion/indexing is working.
+This deployment approach is for the demo corpus. For a larger or frequently updated corpus, artifacts should be produced by a proper ingestion/indexing pipeline and deployed through a more durable data storage strategy.
 
 ---
 
@@ -301,10 +319,10 @@ Court
 
 **Interpreted roles**
 
-- **Docket** = canonical case-level identity
-- **Cluster** = thin linking/enrichment layer
-- **Opinion** = text-bearing object and search anchor
-- **Chunk** = retrieval unit derived from opinion text
+* **Docket** = canonical case-level identity
+* **Cluster** = thin linking/enrichment layer
+* **Opinion** = text-bearing object and search anchor
+* **Chunk** = retrieval unit derived from opinion text
 
 This is the source-faithful logical model the MVP is designed around.
 
@@ -316,19 +334,19 @@ This is the source-faithful logical model the MVP is designed around.
 
 Current planned entities:
 
-- `cases` — canonical case-level records derived from dockets
-- `clusters` — thin decision-event linking/enrichment layer
-- `opinions` — text-bearing records used for search/chunking
-- `chunks` — retrieval units for FTS5 + FAISS
-- `citations` — opinion-level citation edges
+* `cases` — canonical case-level records derived from dockets
+* `clusters` — thin decision-event linking/enrichment layer
+* `opinions` — text-bearing records used for search/chunking
+* `chunks` — retrieval units for FTS5 + FAISS
+* `citations` — opinion-level citation edges
 
 **Important implementation policy**
 
 The MVP is **normalization-first**:
 
-- preserve the logical source model first
-- allow only small, explicit denormalizations where justified
-- defer broad flattening/duplication until there is evidence it helps
+* preserve the logical source model first
+* allow only small, explicit denormalizations where justified
+* defer broad flattening/duplication until there is evidence it helps
 
 **Raw preservation**
 
@@ -350,77 +368,106 @@ For MVP safety, raw CourtListener payloads are preserved as JSON snapshots under
 
 ---
 
-### 5.4 UI Flow
+### 5.4 UI and API Flow
 
-- `/` → search entry page
-- `/search?q=` → results page
-- `/cases/{id}` → case detail page
+The deployed prototype uses FastAPI for both backend APIs and static frontend serving.
 
-The case detail page should feel like a real legal case page, not a generic document view. It is expected to show:
+**Frontend routes**
 
-- case-level metadata
-- one or more linked opinions
-- primary opinion text / sections
-- source traceability
-- citations / related opinions if available
+* `/` → static frontend entry point
+* `#/` → search entry page
+* `#/results?q=...&mode=...` → results page
+* `#/case/{id}` → case detail page
+
+**Backend API routes**
+
+* `GET /health` → health check
+* `GET /stats` → corpus and index metadata
+* `GET /search?query=...&mode=...&limit=...` → keyword/vector/hybrid search
+* `GET /cases/{id}` → structured case detail payload
+
+The case detail page should feel like a real legal case page, not a generic document view. It shows case-level metadata, linked opinions, opinion text, source traceability, and citation placeholders where available.
 
 ---
 
-## 6. Build Plan
+## 6. Build Sequence / Current Implementation State
 
 ### Phase 1 — Dataset Exploration + Corpus Selection
 
+**Status:** complete
+
 Goal:
-- inspect real CourtListener data
-- choose a narrow slice
-- confirm viable fields for the MVP
+
+* inspect real CourtListener data
+* choose a narrow slice
+* confirm viable fields for the MVP
 
 ### Phase 2 — Ingestion + Indexing
 
+**Status:** complete for the current demo corpus
+
 Goal:
-- working local ingestion pipeline
-- raw payload preservation
-- SQLite schema
-- FTS5 indexing
-- chunking
-- embeddings
-- FAISS index
+
+* working local ingestion pipeline
+* raw payload preservation
+* SQLite schema
+* FTS5 indexing
+* chunking
+* embeddings
+* FAISS index
 
 ### Phase 2.5 — Early Deployment
 
+**Status:** complete
+
 Goal:
-- deploy the working app skeleton after Phase 2 so the project has a live environment early
+
+* deploy the working app skeleton after Phase 2 so the project has a live environment early
 
 ### Phase 3 — Search UI
 
+**Status:** implemented as a static React prototype
+
 Goal:
-- keyword + semantic + hybrid results
-- snippets + metadata
-- traceable result cards
+
+* keyword + semantic + hybrid results
+* snippets + metadata
+* traceable result cards
 
 ### Phase 4 — Case Detail
 
+**Status:** implemented for current case/opinion payloads
+
 Goal:
-- structured case page
-- metadata + provenance
-- linked opinions
-- citations / related docs if feasible
+
+* structured case page
+* metadata + provenance
+* linked opinions
+* citations / related docs if feasible
 
 ### Phase 5 — Optional AI Enhancement
 
+**Status:** deferred
+
 Goal:
-- grounded summary or “why this matched”
+
+* grounded summary or “why this matched”
 
 ### Phase 6 — Polish
 
+**Status:** ongoing
+
 Goal:
-- UX improvements
-- empty states
-- demo readiness
+
+* UX improvements
+* empty states
+* demo readiness
 
 ---
 
 ## 7. Risks and Fallbacks
+
+The highest-risk early build items have now been resolved for the demo corpus. Remaining risks are mostly product polish, scaling, and future corpus expansion.
 
 ### Risk: dataset ingestion drags
 
@@ -430,13 +477,13 @@ Goal:
 
 **Fallback:** use local embeddings immediately.
 
-### Risk: deployment friction
+### Risk: hosted demo availability
 
-**Fallback:** continue locally and push deployment slightly later instead of blocking progress.
+**Mitigation:** keep the deployed service simple, use prebuilt demo artifacts, and monitor the health endpoint.
 
 ### Risk: chunking complexity grows
 
-**Fallback:** keep section-aware as the preferred path, but fall back to paragraph-group or fixed-size chunks instead of forcing perfect parsing.
+**Fallback:** keep section-aware chunking as a future improvement, but use paragraph-group or fixed-size chunks instead of forcing perfect parsing.
 
 ### Risk: metadata sparsity in recent cases
 
@@ -446,35 +493,31 @@ Goal:
 
 ## 8. Current Open Questions
 
-Only unresolved items belong here.
+Only unresolved or future-facing items belong here.
 
 ### 8.1 Landmark Expansion Depth
 
 **Status:** open
 
-**Why still open:** the initial CourtListener slice is now settled as:
-- **Pass 1:** recent published SCOTUS, limited to 50–100 opinions
-- **Pass 2:** curated landmark cases
+The deployed demo currently uses a recent SCOTUS-focused corpus. A future pass may add curated landmark cases to improve recognizability, richer citation structure, and older multi-opinion decision patterns.
 
-What remains open is how aggressively the landmark pass should be expanded beyond the initial curated set.
+### 8.2 Citation Ingestion and Related-Case Views
 
-### 8.2 Embedding Provider Execution
+**Status:** partially deferred
 
-**Status:** operationally open, strategically settled
+The schema includes citation support, and the case detail API includes a `citations` field. Full citation ingestion and richer related-case views are deferred beyond the current demo.
 
-**Current leaning:** OpenAI first, local fallback if setup friction appears.
+### 8.3 Case-Level Result Grouping
 
-### 8.3 Cluster Normalization Depth
+**Status:** open / next improvement
 
-**Status:** open, leaning thin table
+Current search results are returned at the chunk level. Production-style search should group results by case and show the best-matching passages underneath each case.
 
-**Why still open:** the existence of a normalized `clusters` table is settled, but the exact depth of cluster normalization for MVP is still under review.
+### 8.4 Section-Aware Chunking
 
-### 8.4 Citation Scope
+**Status:** deferred
 
-**Status:** open
-
-**Question:** should citations preserve only in-corpus edges, or also out-of-corpus references?
+The implemented MVP uses paragraph-first chunking with `section_hint = NULL`. Section-aware chunking remains a future improvement if reliable heading/section detection becomes worthwhile.
 
 ---
 
@@ -484,10 +527,10 @@ This document defines the **architectural direction**.
 
 `docs/schema.md` is the more detailed source for:
 
-- CourtListener exploration findings
-- locked schema decisions
-- open schema questions
-- current recommended MVP schema
+* CourtListener exploration findings
+* locked schema decisions
+* open schema questions
+* current recommended MVP schema
 
 If this document and `docs/schema.md` ever diverge temporarily, treat `docs/schema.md` as the more current source of truth for data-model specifics.
 
@@ -495,8 +538,10 @@ If this document and `docs/schema.md` ever diverge temporarily, treat `docs/sche
 
 ## 10. Change Log
 
-- **v0.1** — first real filled architecture draft created from the agreed template, with all currently locked decisions filled in and remaining unresolved items marked as open.
-- **v0.2** — updated the architecture to reflect the newer CourtListener-driven model: docket as canonical case identity, cluster as thin linking layer, opinion as text/search anchor, chunk as retrieval unit; aligned UI flow and build plan with the current schema direction; added containerization as a locked architectural decision; clarified that exact SQL/schema details live in `docs/schema.md`.
-- **v0.3** — updated storage-path references to match the restructured project layout, including `storage/raw/` for raw payload preservation and `storage/` as the runtime artifact area in containerized development.
-- **v0.4** — aligned the containerization section with the current named-volume storage policy, removed duplicated bullets, and clarified that storage-writing scripts must run inside the containerized environment.
-- **v0.5** — updated the dataset section to reflect the now-settled CourtListener corpus plan: Pass 1 recent published SCOTUS, followed by a curated landmark-case pass; replaced the stale open question about the exact slice.
+* **v0.1** — first real filled architecture draft created from the agreed template, with all currently locked decisions filled in and remaining unresolved items marked as open.
+* **v0.2** — updated the architecture to reflect the newer CourtListener-driven model: docket as canonical case identity, cluster as thin linking layer, opinion as text/search anchor, chunk as retrieval unit; aligned UI flow and build plan with the current schema direction; added containerization as a locked architectural decision; clarified that exact SQL/schema details live in `docs/schema.md`.
+* **v0.3** — updated storage-path references to match the restructured project layout, including `storage/raw/` for raw payload preservation and `storage/` as the runtime artifact area in containerized development.
+* **v0.4** — aligned the containerization section with the current named-volume storage policy, removed duplicated bullets, and clarified that storage-writing scripts must run inside the containerized environment.
+* **v0.5** — updated the dataset section to reflect the now-settled CourtListener corpus plan: Pass 1 recent published SCOTUS, followed by a curated landmark-case pass; replaced the stale open question about the exact slice.
+* **v0.6** — updated the architecture baseline to reflect the implemented/deployed MVP: static React frontend served by FastAPI, paragraph-first chunking, Render deployment with committed SQLite/FAISS demo artifacts, current API/frontend routing, and updated open questions for post-demo improvements.
+
