@@ -68,6 +68,11 @@ const StatsCard = () => {
   );
 };
 
+const modeLabel = (mode) =>
+  mode === "fts" ? "keyword" :
+    mode === "vector" ? "semantic" :
+      "hybrid";
+
 const ExampleQueries = ({ onPick }) => (
   <section>
     <div className="eyebrow" style={{ marginBottom: 12 }}>Try a query</div>
@@ -93,7 +98,7 @@ const ExampleQueries = ({ onPick }) => (
           >
             <span style={{ fontFamily: "var(--serif)", fontSize: 16, fontStyle: "italic", textWrap: "pretty" }}>"{ex.q}"</span>
             <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--ink-4)", letterSpacing: "0.03em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
-              {ex.hint} · {ex.mode} →
+              {ex.hint} · {modeLabel(ex.mode)} →
             </span>
           </button>
         </li>
