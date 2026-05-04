@@ -5,7 +5,17 @@
 __pycache__
 *.py[cod]
 .env
-storage/sqlite/*.db
-storage/raw
-storage/faiss
 .DS_Store
+
+# Exclude raw payloads and SQLite sidecar/temp files
+storage/raw
+storage/sqlite/*.db-*
+storage/sqlite/*.db-wal
+storage/sqlite/*.db-shm
+storage/sqlite/*.db-journal
+
+# Keep committed demo artifacts in the Docker image:
+# - storage/sqlite/casebase.db
+# - storage/faiss/chunks.index
+# - storage/faiss/chunks_ids.npy
+# - storage/faiss/chunks_meta.json
